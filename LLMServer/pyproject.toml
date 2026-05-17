@@ -1,0 +1,13 @@
+[project]
+name = "llm-rag-server"
+version = "0.1.0"
+description = "独立的 RAG HTTP 服务: 对接火山知识库 + 豆包 Ark, OpenAI 兼容接口"
+requires-python = ">=3.10"
+
+[tool.pyright]
+# 让 Pylance / Pyright 把当前目录视为源码根
+include = ["."]
+extraPaths = ["."]
+
+[tool.ruff]
+src = ["."]

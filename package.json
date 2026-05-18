@@ -4,9 +4,9 @@
   "license": "BSD-3-Clause",
   "private": true,
   "dependencies": {
+    "@arco-design/web-react": "^2.65.0",
     "@reduxjs/toolkit": "^1.8.3",
     "@volcengine/rtc": "~4.66.20",
-    "@arco-design/web-react": "^2.65.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-redux": "^8.0.2",
@@ -47,7 +47,7 @@
     ]
   },
   "devDependencies": {
-    "@craco/craco": "^6.4.5",
+    "@craco/craco": "^7.1.0",
     "@types/lodash": "^4.17.4",
     "@types/node": "^16.11.45",
     "@types/react": "^18.0.15",

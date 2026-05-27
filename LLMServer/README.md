@@ -168,7 +168,10 @@ curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d "{\"context_id\":\"$CTX\",\"messages\":[{\"role\":\"user\",\"content\":\"我刚才说我叫什么?\"}],\"stream\":false,\"rag_enabled\":false}"
 ```
-
+## 使用ngrok将本地localhost:3002映射到公网可以访问的地址
+```bash
+ngrok http 3002
+```
 ## 配置说明 (`.env`)
 
 | 变量 | 必填 | 说明 |

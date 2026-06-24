@@ -5,8 +5,10 @@ RAG 编排: 取用户最后一句 → 调火山知识库检索 → 拼 prompt。
 
 from typing import Optional
 
+import config
 from knowledge_base import viking_kb
 from rag.prompt import SYSTEM_NO_CONTEXT, SYSTEM_WITH_CONTEXT, format_context
+from llm import shared_platform_client
 
 
 def extract_last_user_query(messages: list[dict]) -> str:
@@ -35,12 +37,25 @@ async def build_messages(
     query = extract_last_user_query(messages)
     chunks: list[dict] = []
     if query:
-        chunks = await viking_kb.search(query, top_k=top_k)
+        if config.SHARED_PLATFORM_ENABLED:
+            chunks = await shared_platform_client.search_rag(query, top_k=top_k)
+        else:
+            chunks = await viking_kb.search(query, top_k=top_k)
 
     if chunks:
-        system_content = SYSTEM_WITH_CONTEXT.format(context=format_context(chunks))
+        context = format_context(chunks)
+        if config.SHARED_PLATFORM_ENABLED:
+            system_content = await shared_platform_client.render_prompt(
+                "aigc.voice.rag.with_context",
+                variables={"context": context},
+            )
+        else:
+            system_content = SYSTEM_WITH_CONTEXT.format(context=context)
     else:
-        system_content = SYSTEM_NO_CONTEXT
+        if config.SHARED_PLATFORM_ENABLED:
+            system_content = await shared_platform_client.render_prompt("aigc.voice.rag.no_context")
+        else:
+            system_content = SYSTEM_NO_CONTEXT
 
     # 去掉用户原本的 system, 用我们自己的 system 替换
     rest = [m for m in messages if m.get("role") != "system"]

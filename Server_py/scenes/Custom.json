@@ -1,7 +1,7 @@
 {
   "SceneConfig": {
     "icon": "",
-    "name": "面试助手"
+    "name": "智能营销客服"
   },
   "AccountConfig": {
     "accessKeyId": "AKLTMjRiMmEyN2VhMjk1NDU3MGE3YjNmOTdkYTZmYTVhNzc",
@@ -11,7 +11,7 @@
     "AppId": "6a07de1b6e9c9a01e150327c",
     "RoomId": "ChatRoom01",
     "UserId": "Huoshan01",
-    "Token": "0016a07de1b6e9c9a01e150327cSQAUkpMC6VERammMGmoKAENoYXRSb29tMDEJAEh1b3NoYW4wMQYAAABpjBpqAQBpjBpqAgBpjBpqAwBpjBpqBABpjBpqBQBpjBpqIAAE8ix2EKukveAiC+KOymgYN3wGGDeoCoEQupo3X2WK1Q=="
+    "Token": "0016a07de1b6e9c9a01e150327cSQDODwsEa7Q7auvuRGoKAENoYXRSb29tMDEJAEh1b3NoYW4wMQYAAADr7kRqAQDr7kRqAgDr7kRqAwDr7kRqBADr7kRqBQDr7kRqIADlz/4Vuk20Ov+gywRRCbsq2UB9pL4ugaX/57l042VGjw=="
   },
   "VoiceChat": {
     "AppId": "6a07de1b6e9c9a01e150327c",
@@ -21,7 +21,7 @@
       "TargetUserId": [
         "Huoshan01"
       ],
-      "WelcomeMessage": "我是智能语音客服，有什么需要帮忙的吗？",
+      "WelcomeMessage": "你好，我是智能小智，有什么需要帮忙的吗？",
       "UserId": "ChatBot01",
       "EnableConversationStateCallback": true
     },

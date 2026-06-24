@@ -10,7 +10,6 @@ import {
   NetworkQuality,
   RemoteAudioStats,
 } from '@volcengine/rtc';
-import RtcClient from '@/lib/RtcClient';
 
 export interface IUser {
   username?: string;
@@ -214,12 +213,6 @@ export const roomSlice = createSlice({
 
     updateRTCConfig: (state, { payload }) => {
       state.rtcConfigMap = payload;
-      RtcClient.basicInfo = {
-        app_id: payload[state.scene].AppId,
-        room_id: payload[state.scene].RoomId,
-        user_id: payload[state.scene].UserId,
-        token: payload[state.scene].Token,
-      };
     },
 
     updateLocalUser: (state, { payload }: { payload: Partial<LocalUser> }) => {

@@ -11,12 +11,14 @@ export const UserAgreement = 'https://www.volcengine.com/docs/6348/128955';
  * @note 请求的 API Proxy Server(对应此 Demo 中包含的 Node server) 地址。
  *       您可按需改成自己需要访问的地址。
  */
-export const AIGC_PROXY_HOST = 'http://localhost:3001';
+export const AIGC_PROXY_HOST =
+  process.env.REACT_APP_AIGC_PROXY_HOST || 'http://localhost:3002';
 
 /**
  * @note LLMServer 地址 (历史对话 / session 缓存接口在这里)。
  */
-export const LLM_SERVER_HOST = 'http://localhost:3000';
+export const LLM_SERVER_HOST =
+  process.env.REACT_APP_LLM_SERVER_HOST || 'http://localhost:3001';
 
 export interface IScene {
   icon: string;

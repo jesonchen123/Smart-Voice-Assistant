@@ -40,6 +40,18 @@ SERVER_HOST = _get("SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(_get("SERVER_PORT", "3000"))
 LOG_LEVEL = _get("LOG_LEVEL", "INFO")
 
+# ---------------- MCP_Cluster 共享平台 ----------------
+# 开启后，LLMServer 对外仍保持 OpenAI-compatible 接口，内部 LLM 调用走 MCP_Cluster。
+SHARED_PLATFORM_ENABLED = _get("SHARED_PLATFORM_ENABLED", "false").lower() in (
+    "1", "true", "yes", "on"
+)
+SHARED_PLATFORM_BASE_URL = _get("SHARED_PLATFORM_BASE_URL", "http://localhost:8000")
+SHARED_PLATFORM_PROJECT_ID = _get("SHARED_PLATFORM_PROJECT_ID", "aigc_rtc")
+SHARED_PLATFORM_ENV = _get("SHARED_PLATFORM_ENV", "dev")
+SHARED_PLATFORM_TASK_TYPE = _get("SHARED_PLATFORM_TASK_TYPE", "voice_dialogue")
+SHARED_PLATFORM_MODEL_POLICY_ID = _get("SHARED_PLATFORM_MODEL_POLICY_ID", "voice_low_latency")
+SHARED_PLATFORM_TIMEOUT = float(_get("SHARED_PLATFORM_TIMEOUT", "120"))
+
 
 PLACEHOLDER_PREFIXES = ("", "your_", "<", "ep-xxxx", "ep-xxxxx")
 

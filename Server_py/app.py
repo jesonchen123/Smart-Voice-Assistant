@@ -29,7 +29,7 @@ Scenes = read_files('./scenes', '.json')
 
 # LLMServer 内网地址。RTC 看到的是 LLMConfig.Url 里的公网 ngrok 地址,
 # 但 Server_py 自己调 /v1/context/create 走本机直连更快也更稳。
-LLM_SERVER_INTERNAL_URL = os.environ.get('LLM_SERVER_INTERNAL_URL', 'http://localhost:3000')
+LLM_SERVER_INTERNAL_URL = os.environ.get('LLM_SERVER_INTERNAL_URL', 'http://localhost:3001')
 
 
 async def _create_llm_context() -> str | None:
@@ -59,6 +59,27 @@ def _inject_context_id_into_url(url: str, context_id: str) -> str:
     query = dict(parse_qsl(parsed.query, keep_blank_values=True))
     query['context_id'] = context_id
     return urlunparse(parsed._replace(query=urlencode(query)))
+
+
+def _sync_rtc_identity(rtc_config: dict, voice_chat: dict, room_id: str, user_id: str):
+    rtc_config['RoomId'] = room_id
+    rtc_config['UserId'] = user_id
+    voice_chat['RoomId'] = room_id
+
+    agent_config = voice_chat.setdefault('AgentConfig', {})
+    target_user_ids = agent_config.setdefault('TargetUserId', [user_id])
+    if target_user_ids:
+        target_user_ids[0] = user_id
+    else:
+        target_user_ids.append(user_id)
+
+
+def _generate_rtc_token(app_id: str, app_key: str, room_id: str, user_id: str) -> str:
+    key = AccessToken(app_id, app_key, room_id, user_id)
+    key.add_privilege(Privileges.PrivSubscribeStream, 0)
+    key.add_privilege(Privileges.PrivPublishStream, 0)
+    key.expire_time(int(time.time()) + 24 * 3600)
+    return key.serialize()
 
 app = FastAPI(title='AIGC Server (Python)', version='1.0.0')
 
@@ -190,7 +211,16 @@ async def get_scenes(request: Request):
 
             assert_(app_id, f'{scene_name} 场景的 RTCConfig.AppId 不能为空')
 
-            if app_id and (not token or not user_id or not room_id):
+            room_id = room_id or str(uuid.uuid4())
+            user_id = user_id or str(uuid.uuid4())
+            _sync_rtc_identity(rtc_config, voice_chat, room_id, user_id)
+
+            if app_key:
+                rtc_config['Token'] = _generate_rtc_token(app_id, app_key, room_id, user_id)
+            else:
+                assert_(token, f'{scene_name} 场景的 RTCConfig.Token 不能为空；如需服务端自动生成 Token，请补充 RTCConfig.AppKey')
+
+            if False and app_id and (not token or not user_id or not room_id):
                 room_id = room_id or str(uuid.uuid4())
                 user_id = user_id or str(uuid.uuid4())
                 rtc_config['RoomId'] = room_id
@@ -238,5 +268,6 @@ async def get_scenes(request: Request):
 
 
 if __name__ == '__main__':
-    print('AIGC Server is running at http://localhost:3001')
-    uvicorn.run('app:app', host='0.0.0.0', port=3001, reload=True)
+    port = int(os.environ.get('AIGC_SERVER_PORT', os.environ.get('PORT', '3002')))
+    print(f'AIGC Server is running at http://localhost:{port}')
+    uvicorn.run('app:app', host='0.0.0.0', port=port, reload=True)

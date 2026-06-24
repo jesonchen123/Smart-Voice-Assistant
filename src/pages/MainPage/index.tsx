@@ -5,6 +5,7 @@
 
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
+import { Modal } from '@arco-design/web-react';
 import Header from '@/components/Header';
 import ResizeWrapper from '@/components/ResizeWrapper';
 import Menu from './Menu';
@@ -22,12 +23,26 @@ export default function () {
   const dispatch = useDispatch();
 
   const getScenes = async () => {
-    const { scenes }: {
-      scenes: {
-        rtc: RTCConfig;
-        scene: SceneConfig;
-      }[];
-    } = await Apis.Basic.getScenes();
+    let scenes: {
+      rtc: RTCConfig;
+      scene: SceneConfig;
+    }[] = [];
+    try {
+      ({ scenes = [] } = await Apis.Basic.getScenes());
+    } catch (e) {
+      Modal.error({
+        title: '场景配置加载失败',
+        content: '请确认 AIGC 后端服务已启动，并且前端 AIGC_PROXY_HOST 指向该服务。',
+      });
+      return;
+    }
+    if (!scenes.length) {
+      Modal.error({
+        title: '场景配置为空',
+        content: '后端 /getScenes 未返回可用场景，请检查 Server_py/scenes 下的配置文件。',
+      });
+      return;
+    }
     dispatch(updateScene(scenes[0].scene.id));
     dispatch(updateSceneConfig(
       scenes.reduce<Record<string, SceneConfig>>((prev, cur) => {

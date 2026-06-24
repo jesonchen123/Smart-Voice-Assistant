@@ -18,7 +18,9 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+import config
 from llm import ark_client
+from llm import shared_platform_client
 from llm.session_manager import get_manager
 from rag.pipeline import build_messages, extract_last_user_query
 from rag.prompt import SYSTEM_BASE, prepend_context_to_user
@@ -45,7 +47,12 @@ class CreateContextRequest(BaseModel):
 
 @router.post("/v1/context/create")
 async def create_context(req: CreateContextRequest):
-    system_prompt = (req.system_prompt or SYSTEM_BASE).strip()
+    if req.system_prompt:
+        system_prompt = req.system_prompt.strip()
+    elif config.SHARED_PLATFORM_ENABLED:
+        system_prompt = (await shared_platform_client.render_prompt("aigc.voice.persona.default")).strip()
+    else:
+        system_prompt = SYSTEM_BASE.strip()
     sid = await get_manager().new_session(system_prompt)
     return JSONResponse(content={
         "context_id": sid,
@@ -105,7 +112,10 @@ async def chat_completions(
                     temperature=req.temperature,
                     max_tokens=req.max_tokens,
                 ):
-                    data = chunk.model_dump(exclude_none=True)
+                    if isinstance(chunk, dict):
+                        data = chunk
+                    else:
+                        data = chunk.model_dump(exclude_none=True)
                     yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
                 yield "data: [DONE]\n\n"
             except Exception as e:
@@ -170,7 +180,10 @@ async def _chat_with_session(req: ChatRequest):
 
     chunks: list[dict] = []
     if req.rag_enabled:
-        chunks = await viking_kb.search(user_text, top_k=req.top_k)
+        if config.SHARED_PLATFORM_ENABLED:
+            chunks = await shared_platform_client.search_rag(user_text, top_k=req.top_k)
+        else:
+            chunks = await viking_kb.search(user_text, top_k=req.top_k)
     final_user = prepend_context_to_user(user_text, chunks)
 
     # 链过期兜底用: 把 DB 里历史拉出来 (顺序: 旧 -> 新)

@@ -5,21 +5,17 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import CustomerServiceIcon from '@/assets/img/CustomerService.svg';
 
-/** 服务端下发的 icon 若非 http 链接，则用本地打包资源兜底 */
-export function resolveIcon(icon?: string): string {
-  if (!icon || !icon.startsWith('http')) return CustomerServiceIcon;
-  return icon;
-}
 import VERTC, { MediaType } from '@volcengine/rtc';
-import { Modal } from '@arco-design/web-react';
+import { Message, Modal } from '@arco-design/web-react';
+import CustomerServiceIcon from '@/assets/img/CustomerService.svg';
 import RtcClient from '@/lib/RtcClient';
 import {
   clearCurrentMsg,
   clearHistoryMsg,
   localJoinRoom,
   localLeaveRoom,
+  RTCConfig,
   updateAIGCState,
   updateLocalUser,
 } from '@/store/slices/room';
@@ -36,6 +32,12 @@ import {
 } from '@/store/slices/device';
 import logger from '@/utils/logger';
 
+/** 服务端下发的 icon 若非 http 链接，则用本地打包资源兜底 */
+export function resolveIcon(icon?: string): string {
+  if (!icon || !icon.startsWith('http')) return CustomerServiceIcon;
+  return icon;
+}
+
 export const ABORT_VISIBILITY_CHANGE = 'abortVisibilityChange';
 export interface FormProps {
   username: string;
@@ -47,12 +49,12 @@ export const useScene = () => {
   const { scene, sceneConfigMap } = useSelector((state: RootState) => state.room);
   const config = sceneConfigMap[scene] || {};
   return { ...config, icon: resolveIcon(config.icon) };
-}
+};
 
 export const useRTC = () => {
   const { scene, rtcConfigMap } = useSelector((state: RootState) => state.room);
   return rtcConfigMap[scene] || {};
-}
+};
 
 export const useDeviceState = () => {
   const dispatch = useDispatch();
@@ -98,7 +100,7 @@ export const useDeviceState = () => {
         ? RtcClient.publishStream(MediaType.AUDIO)
         : RtcClient.unpublishStream(MediaType.AUDIO));
     }
-    queryDevices(MediaType.AUDIO);
+    await queryDevices(MediaType.AUDIO);
     await (!isAudioPublished ? RtcClient.startAudioCapture() : RtcClient.stopAudioCapture());
     dispatch(
       updateLocalUser({
@@ -113,7 +115,7 @@ export const useDeviceState = () => {
         ? RtcClient.publishStream(MediaType.VIDEO)
         : RtcClient.unpublishStream(MediaType.VIDEO));
     }
-    queryDevices(MediaType.VIDEO);
+    await queryDevices(MediaType.VIDEO);
     await (!isVideoPublished ? RtcClient.startVideoCapture() : RtcClient.stopVideoCapture());
     dispatch(
       updateLocalUser({
@@ -172,10 +174,7 @@ export const useGetDevicePermission = () => {
   return permission;
 };
 
-export const useJoin = (): [
-  boolean,
-  () => Promise<void | boolean>
-] => {
+export const useJoin = (): [boolean, () => Promise<void | boolean>] => {
   const devicePermissions = useSelector((state: RootState) => state.device.devicePermissions);
   const room = useSelector((state: RootState) => state.room);
   const currentSid = useSelector((state: RootState) => state.history.currentSid);
@@ -186,6 +185,7 @@ export const useJoin = (): [
   const dispatch = useDispatch();
 
   const { id } = useScene();
+  const rtc = useRTC();
   const { switchMic } = useDeviceState();
   const [joining, setJoining] = useState(false);
   const listeners = useRtcListeners();
@@ -237,38 +237,73 @@ export const useJoin = (): [
       return;
     }
 
+    const missingRTCFields = (['AppId', 'RoomId', 'UserId', 'Token'] as (keyof RTCConfig)[]).filter(
+      (key) => !rtc?.[key]
+    );
+    if (missingRTCFields.length) {
+      Modal.error({
+        title: 'RTC 配置未加载',
+        content: `未获取到 ${missingRTCFields.join(
+          ', '
+        )}，请确认 AIGC 后端 /getScenes 已启动，并且前端 AIGC_PROXY_HOST 指向该后端。`,
+      });
+      return false;
+    }
+
+    RtcClient.basicInfo = {
+      app_id: rtc.AppId,
+      room_id: rtc.RoomId,
+      user_id: rtc.UserId,
+      token: rtc.Token,
+    };
+
     setJoining(true);
 
-    /** 1. Create RTC Engine */
-    await RtcClient.createEngine();
+    try {
+      /** 1. Create RTC Engine */
+      await RtcClient.createEngine();
 
-    /** 2.1 Set events callbacks */
-    RtcClient.addEventListeners(listeners);
+      /** 2.1 Set events callbacks */
+      RtcClient.addEventListeners(listeners);
 
-    /** 2.2 RTC starting to join room */
-    await RtcClient.joinRoom();
-    /** 3. Set users' devices info */
-    const mediaDevices = await RtcClient.getDevices({
-      audio: true,
-      video: false,
-    });
+      /** 2.2 RTC starting to join room */
+      await RtcClient.joinRoom();
+      /** 3. Set users' devices info */
+      const mediaDevices = await RtcClient.getDevices({
+        audio: true,
+        video: false,
+      });
 
-    dispatch(
-      localJoinRoom({
-        roomId: RtcClient.basicInfo.room_id,
-        user: {
-          username: RtcClient.basicInfo.user_id,
-          userId: RtcClient.basicInfo.user_id,
-        },
-      })
-    );
-    dispatch(
-      updateSelectedDevice({
-        selectedMicrophone: mediaDevices.audioInputs[0]?.deviceId,
-        selectedCamera: mediaDevices.videoInputs[0]?.deviceId,
-      })
-    );
-    dispatch(updateMediaInputs(mediaDevices));
+      dispatch(
+        localJoinRoom({
+          roomId: RtcClient.basicInfo.room_id,
+          user: {
+            username: RtcClient.basicInfo.user_id,
+            userId: RtcClient.basicInfo.user_id,
+          },
+        })
+      );
+      dispatch(
+        updateSelectedDevice({
+          selectedMicrophone: mediaDevices.audioInputs[0]?.deviceId,
+          selectedCamera: mediaDevices.videoInputs[0]?.deviceId,
+        })
+      );
+      dispatch(updateMediaInputs(mediaDevices));
+    } catch (e) {
+      setJoining(false);
+      const message = e instanceof Error ? e.message : String(e || '');
+      if (message.includes('token_error')) {
+        Modal.error({
+          title: 'RTC Token 校验失败',
+          content:
+            '请检查 Server_py/scenes/Custom.json 中 RTCConfig 的 AppId、AppKey、RoomId、UserId、Token 是否匹配。建议补充真实 AppKey，让后端自动生成 Token。',
+        });
+      } else {
+        Message.error(`加入房间失败: ${message}`);
+      }
+      throw e;
+    }
 
     setJoining(false);
 
@@ -280,7 +315,11 @@ export const useJoin = (): [
       }
     }
 
-    handleAIGCModeStart();
+    try {
+      await handleAIGCModeStart();
+    } catch (e) {
+      logger.debug('start AIGC failed:', e);
+    }
   }
 
   return [joining, disPatchJoin];
@@ -294,9 +333,9 @@ export const useLeave = () => {
 
   return async function () {
     await Promise.all([
-      RtcClient.stopAudioCapture,
-      RtcClient.stopScreenCapture,
-      RtcClient.stopVideoCapture,
+      RtcClient.stopAudioCapture(),
+      RtcClient.stopScreenCapture(),
+      RtcClient.stopVideoCapture(),
     ]);
     await RtcClient.stopAgent(idRef.current);
     await RtcClient.leaveRoom();

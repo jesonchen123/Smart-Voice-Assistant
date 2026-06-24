@@ -190,6 +190,15 @@ ngrok http 3002
 | `VIKING_KB_SEARCH_PATH` | ⬜ | 检索接口路径, 按实际文档调整 |
 | `SERVER_PORT` | ⬜ | 监听端口, 默认 `3000` |
 
+### MCP_Cluster 共享平台调度
+
+| 变量 | 默认值 | 说明 |
+|------|------|------|
+| `SHARED_PLATFORM_ENABLED` | `false` | 开启后，LLMServer 内部模型调用改走 MCP_Cluster，外部 `/v1/chat/completions` 入口不变 |
+| `SHARED_PLATFORM_BASE_URL` | `http://localhost:8400` | MCP_Cluster 共享平台地址；本地建议固定 8400，避免和其它 backend_api 的 8000 冲突 |
+| `SHARED_PLATFORM_PROJECT_ID` | `aigc_rtc` | 共享平台项目 ID |
+| `SHARED_PLATFORM_TASK_TYPE` / `SHARED_PLATFORM_MODEL_POLICY_ID` | `voice_dialogue` / `voice_low_latency` | 对应共享平台 seed 中的智能客服模型策略 |
+
 ## 创建知识库 (一次性)
 
 如果还没在火山控制台建过 collection, 配好 AK/SK 后直接命令行建:

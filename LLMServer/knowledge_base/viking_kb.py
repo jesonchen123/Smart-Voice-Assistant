@@ -5,6 +5,7 @@
 """
 
 import json
+import re
 from typing import Optional
 
 import httpx
@@ -13,6 +14,8 @@ from volcengine.base.Request import Request
 from volcengine.Credentials import Credentials
 
 import config
+
+_COLLECTION_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
 # ---------------- 内部: 构造已签名的 Request ----------------
@@ -134,6 +137,16 @@ def _normalize_chunks(raw: dict) -> list[dict]:
     return result
 
 
+def _invalid_collection_name_error(name: str) -> Optional[str]:
+    if _COLLECTION_NAME_RE.fullmatch(name):
+        return None
+    return (
+        f"Invalid collection name {name!r}. Viking KB collection names must start "
+        "with a letter and contain only letters, numbers, and underscores; "
+        "omit collection to use VIKING_KB_COLLECTION_NAME."
+    )
+
+
 # ---------------- 业务 API ----------------
 
 async def search_with_debug(
@@ -151,6 +164,14 @@ async def search_with_debug(
         "query": query,
         "limit": top_k or config.VIKING_KB_TOP_K,
     }
+    if err := _invalid_collection_name_error(name):
+        print(f"[viking_kb] {err}")
+        return {
+            "chunks": [],
+            "raw": None,
+            "request_body": body,
+            "error": err,
+        }
     try:
         raw = await _call("POST", config.VIKING_KB_SEARCH_PATH, data=body)
         biz_err = None

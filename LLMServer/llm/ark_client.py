@@ -18,6 +18,7 @@ from openai import AsyncOpenAI
 
 import config
 
+from llm import shared_platform_client
 _async_client: Optional[AsyncOpenAI] = None
 
 
@@ -40,6 +41,15 @@ async def stream_chat(
     max_tokens: Optional[int] = None,
 ) -> AsyncIterator[dict]:
     """返回 openai SDK 的 ChatCompletionChunk 异步迭代器, 上层转 SSE。"""
+    if config.SHARED_PLATFORM_ENABLED:
+        async for chunk in shared_platform_client.stream_chat_chunks(
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        ):
+            yield chunk
+        return
+
     config.assert_filled("ARK_CHAT_ENDPOINT_ID", config.ARK_CHAT_ENDPOINT_ID)
     client = get_client()
     stream = await client.chat.completions.create(
@@ -59,6 +69,13 @@ async def complete_chat(
     max_tokens: Optional[int] = None,
 ) -> dict:
     """非流式调用 chat.completions, 用于调试 / curl 验证。"""
+    if config.SHARED_PLATFORM_ENABLED:
+        return await shared_platform_client.complete_chat(
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
     config.assert_filled("ARK_CHAT_ENDPOINT_ID", config.ARK_CHAT_ENDPOINT_ID)
     client = get_client()
     resp = await client.chat.completions.create(
@@ -191,6 +208,18 @@ async def responses_complete(
     history_fallback: 如果 previous_response_id 过期, 用这段历史 (DB 里的
     user/assistant 消息列表, 顺序从老到新) 重发一次, 重建链。
     """
+    if config.SHARED_PLATFORM_ENABLED:
+        input_messages = _build_input_from_history(
+            system_prompt,
+            history_fallback or [],
+            user_text,
+        )
+        data = await shared_platform_client.complete_chat(
+            messages=input_messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return data, data.get("id", "")
     config.assert_filled("ARK_CHAT_ENDPOINT_ID", config.ARK_CHAT_ENDPOINT_ID)
     client = get_client()
 
@@ -236,6 +265,23 @@ async def responses_stream(
 
     history_fallback: 链过期时拿来重建链, 同非流式分支。
     """
+    if config.SHARED_PLATFORM_ENABLED:
+        input_messages = _build_input_from_history(
+            system_prompt,
+            history_fallback or [],
+            user_text,
+        )
+        local_response_id = "chatcmpl-" + _uuid.uuid4().hex[:16]
+        reported = False
+        async for chunk in shared_platform_client.stream_text(
+            messages=input_messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        ):
+            yield _wrap_chat_chunk(chunk, "shared-platform", local_response_id), (local_response_id if not reported else None)
+            reported = True
+        yield _wrap_chat_chunk("", "shared-platform", local_response_id, finish_reason="stop"), None
+        return
     config.assert_filled("ARK_CHAT_ENDPOINT_ID", config.ARK_CHAT_ENDPOINT_ID)
     client = get_client()
 

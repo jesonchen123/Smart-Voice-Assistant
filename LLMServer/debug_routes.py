@@ -8,7 +8,9 @@ from typing import Optional
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
+import config
 from knowledge_base import viking_kb
+from llm import shared_platform_client
 from rag.pipeline import build_messages
 
 router = APIRouter(prefix="/debug", tags=["debug"])
@@ -48,6 +50,16 @@ async def debug_search(
     只跑知识库检索, 不做 prompt 拼装。
     raw=true 时把火山原始响应一起返回, 用于排查"为什么我有关键词但召回 0 条"。
     """
+    if config.SHARED_PLATFORM_ENABLED:
+        chunks = await shared_platform_client.search_rag(q, top_k=top_k)
+        return JSONResponse(content={
+            "query": q,
+            "hit": bool(chunks),
+            "chunk_count": len(chunks),
+            "chunks": chunks,
+            "error": None,
+            "backend": "mcp_cluster",
+        })
     debug = await viking_kb.search_with_debug(q, top_k=top_k, collection_name=collection)
     body = {
         "query": q,
@@ -55,6 +67,7 @@ async def debug_search(
         "chunk_count": len(debug["chunks"]),
         "chunks": debug["chunks"],
         "error": debug["error"],
+        "backend": "viking_kb",
     }
     if raw:
         body["request_body"] = debug["request_body"]
